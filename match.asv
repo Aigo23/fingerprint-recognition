@@ -1,0 +1,97 @@
+clc;clear;close all;
+
+
+function  [matched_pts1, matched_pts2, PTS] = matchwithMinu(img1, minu1, img2, minu2)
+
+show = 0;
+
+% img1 = imread('data1\file\img\22.png');
+% img2 = imread('data1\search\img\49.png');
+% 
+% minu1 = LoadNeuFeature('IcnOut\Icn22.txt');
+% minu2 = LoadNeuFeature('IcnSearch\Icn.txt');
+
+% figure(1);
+% img = img12;
+% minu = minu12g;
+% minu(:,3) = minu(:,3);
+% axis equal;axis off;
+% imshow(img);
+% DrawMinu(1,minu,'r');
+
+
+[H,W] = size(img1);
+
+MINU1 = minu1;
+MINU2 = minu2;
+figure(1);axis equal;axis off;title('匹配前');
+DrawMinu(1,MINU1,'b');
+DrawMinu(1,MINU2,'r');
+x1=MINU1(:,1);
+y1=MINU1(:,2);
+theta1=MINU1(:,3);
+M=length(x1);
+x2=MINU2(:,1);
+y2=MINU2(:,2);
+theta2=MINU2(:,3);
+N=length(x2);
+%[h,w]=size(IMG1);
+%% accumulator array
+dtheta=bsxfun(@minus,theta1,theta2');
+dtheta=dtheta/180*pi;
+dtheta(dtheta<0)=dtheta(dtheta<0)+2*pi;
+dx=repmat(x1,[1,N])-repmat(x2',[M,1]).*cos(dtheta)-repmat(y2',[M,1]).*sin(dtheta);
+dy=repmat(y1,[1,N])+repmat(x2',[M,1]).*sin(dtheta)-repmat(y2',[M,1]).*cos(dtheta);
+dtheta=dtheta/pi*180;
+%搜索间隔，为追求速度建议设为5
+%e为配对允许误差
+pts = 0;
+ex = 10;
+ey = 10;
+ez = 30;
+leapx=10;
+leapy=10;
+leapz=10;
+xx=-W/2:leapx:W/2;
+yy=-H/2:leapy:H/2;
+zz=0:leapz:360;
+A=zeros(length(xx)*length(yy)*length(zz),1);
+for i=1:length(xx)*length(yy)*length(zz)
+    [k1,k2,k3]=ind2sub([length(xx),length(yy),length(zz)],i);
+    c1=(dx>=xx(k1)-ex)&(dx<xx(k1)+ex);
+    c2=(dy>=yy(k2)-ey)&(dy<yy(k2)+ey);
+    c3=(dtheta>=zz(k3)-ez)&(dtheta<zz(k3)+ez);
+    c=c1&c2&c3;
+    A(i)=sum(c(:));
+    if A(i) > pts
+        [p1, p2] = find(c > 0);
+        pts = A(i);
+    end
+end
+[~,id]=max(A);
+PTS = max(A);
+A=reshape(A,[length(xx),length(yy),length(zz)]);
+[id1,id2,id3]=ind2sub([length(xx),length(yy),length(zz)],id);
+shiftx=xx(id1);
+shifty=yy(id2);
+shiftz=zz(id3);
+m = A(:,:,id3);
+%figure(2);imshow(A(:,:,id3),[]);title('Accumulator array');
+%% transform
+%(没）考虑旋转
+MINU2_t=[x2+shiftx,y2+shifty,theta2+shiftz];
+figure(2);axis equal;axis off;title('匹配后');
+DrawMinu(2,MINU1,'b');
+DrawMinu(2,MINU2_t,'r');
+
+fprintf("Points = %f\n", PTS/N*100);
+
+pair = [p1, p2];
+matched_pts1 = MINU1(pair(:,1),1:2);
+matched_pts2 = MINU2(pair(:,2),1:2);
+if show
+figure(3);
+showMatchedFeatures(img1, img2, matched_pts1, matched_pts2, 'montage');
+end
+
+end
